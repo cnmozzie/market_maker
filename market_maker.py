@@ -218,7 +218,8 @@ class OrderManager:
         else:
             logger.info("Order Manager initializing, connecting to BitMEX. Live run: executing real trades.")
 
-        self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
+        self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex_test", charset='utf8' )
+        # self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
         self.cursor = self.db.cursor()
         self.start_time = time()
         self.end_time = int((self.start_time+14400)/28800)*28800+14400
@@ -246,7 +247,7 @@ class OrderManager:
             end_time=strftime("%Y-%m-%d %H:%M:%S.000", gmtime(self.end_time)) 
             logger.info("start time: %s; end time: %s" % (start_time, end_time))
             logger.info("Get trades now.") #temp
-            for trade in self.exchange.get_execution_trades(count=2, startTime=start_time, endTime=end_time): #temp
+            for trade in self.exchange.get_execution_trades(count=100, startTime=start_time, endTime=end_time): #temp
                 sql = "INSERT INTO trades_table(execID, symbol, side, \
                        lastQty, lastPx, execComm, execCost, transactTime) \
                        VALUES ('%s', '%s', '%s', %d, %f, %d, %d, '%s' );" % \
