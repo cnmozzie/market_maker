@@ -224,9 +224,14 @@ class OrderManager:
         self.start_time = time()
         self.end_time = int((self.start_time+14400)/28800)*28800+14400
         self.instrument = self.exchange.get_instrument()
-        self.starting_qty = self.exchange.get_delta()
+        position = self.exchange.get_position()
+        self.starting_qty = position['currentQty']
         self.running_qty = self.starting_qty
-        self.reset()
+        self.current_qty = self.starting_qty
+        self.tickId = int(self.start_time/60)
+        self.current_cost = position['currentCost']
+        self.current_comm = position['currentComm']
+
 
     def reset(self):
         self.exchange.cancel_all_orders()
@@ -241,6 +246,17 @@ class OrderManager:
 
         margin = self.exchange.get_margin()
         position = self.exchange.get_position()
+        instrument = self.exchange.get_instrument()
+        if time() > self.tickId*60:
+            sql = "INSERT INTO test_0(id, markPrice, currentQty, currentCost, currentComm) VALUES (%d, %f, %d, %d, %d)" \
+                  % (self.tickId, instrument['markPrice'], self.current_qty, self.current_cost, self.current_comm)
+            logger.info(sql)
+            try:
+                self.cursor.execute(sql)
+                self.db.commit()
+            except:
+                db.rollback()
+            self.tickId = self.tickId+1
         if self.running_qty != position['currentQty'] or time()>self.end_time:
             self.end_time = time()
             start_time=strftime("%Y-%m-%d %H:%M:%S.001", gmtime(self.start_time)) 
@@ -248,21 +264,21 @@ class OrderManager:
             logger.info("start time: %s; end time: %s" % (start_time, end_time))
             logger.info("Get trades now.") #temp
             for trade in self.exchange.get_execution_trades(count=100, startTime=start_time, endTime=end_time): #temp
-                sql = "INSERT INTO trades_table(execID, symbol, side, \
-                       lastQty, lastPx, execComm, execCost, transactTime) \
-                       VALUES ('%s', '%s', '%s', %d, %f, %d, %d, '%s' );" % \
-                      (trade["execID"], trade["symbol"], trade["side"], trade["lastQty"], \
+                trade_message = "(symbol: %s, side: %s, lastQty: %d, lastPx: %f , execComm: %d, execCost: %d, transactTime: %s)" % \
+                      (trade["symbol"], trade["side"], trade["lastQty"],
                        trade["lastPx"], trade["execComm"], trade["execCost"], trade["transactTime"][:23])
-                logger.info(sql) #temp
-                try:
-                    self.cursor.execute(sql)
-                    self.db.commit()
-                except:
-                    db.rollback()
+                logger.info(trade_message) #temp
+                if (trade["side"]=="Sell"):
+                    self.current_qty = self.current_qty - trade["lastQty"];
+                    self.current_cost = self.current_cost + trade["execCost"];
+                elif (trade["side"]=="Buy"):
+                    self.current_qty = self.current_qty + trade["lastQty"];
+                    self.current_cost = self.current_cost + trade["execCost"];
+                self.current_comm = self.current_comm + trade["execComm"];                    
             self.start_time = self.end_time
             self.end_time = int((self.start_time+14400)/28800)*28800+14400
         self.running_qty = position['currentQty']
-        tickLog = self.exchange.get_instrument()['tickLog']
+        tickLog = instrument['tickLog']
         self.start_XBt = margin["marginBalance"]
 
         logger.info("Current XBT Balance: %.6f" % XBt_to_XBT(self.start_XBt))
