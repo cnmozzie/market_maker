@@ -248,14 +248,14 @@ class OrderManager:
         position = self.exchange.get_position()
         instrument = self.exchange.get_instrument()
         if time() > self.tickId*60:
-            sql = "INSERT INTO test_0(id, markPrice, currentQty, currentCost, currentComm) VALUES (%d, %f, %d, %d, %d)" \
+            sql = "INSERT INTO test_0(id, markPrice, currentQty, currentCost, currentComm) VALUES (%d, %f, %d, %d, %d);" \
                   % (self.tickId, instrument['markPrice'], self.current_qty, self.current_cost, self.current_comm)
             logger.info(sql)
             try:
                 self.cursor.execute(sql)
                 self.db.commit()
             except:
-                db.rollback()
+                self.db.rollback()
             self.tickId = self.tickId+1
         if self.running_qty != position['currentQty'] or time()>self.end_time:
             self.end_time = time()
@@ -357,6 +357,12 @@ class OrderManager:
 
         buy_orders = []
         sell_orders = []
+
+        try:
+            self.cursor.execute("delete from test_orders;")
+            self.db.commit()
+        except:
+            self.db.rollback()
         # Create orders from the outside in. This is intentional - let's say the inner order gets taken;
         # then we match orders from the outside in, ensuring the fewest number of orders are amended and only
         # a new order is created in the inside. If we did it inside-out, all orders would be amended
@@ -378,6 +384,16 @@ class OrderManager:
             quantity = settings.ORDER_START_SIZE + ((abs(index) - 1) * settings.ORDER_STEP_SIZE)
 
         price = self.get_price_offset(index)
+
+        # insert into mysql
+        sql = "INSERT INTO test_orders(id, price, orderBy, side, timestamp) VALUES (%d, %f, %d, '%s', now());" \
+                  % (index, price, quantity, "Buy" if index < 0 else "Sell")
+        #logger.info(sql)
+        try:
+            self.cursor.execute(sql)
+            self.db.commit()
+        except:
+            self.db.rollback()
 
         return {'price': price, 'orderQty': quantity, 'side': "Buy" if index < 0 else "Sell"}
 
