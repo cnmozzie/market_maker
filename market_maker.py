@@ -290,7 +290,7 @@ class OrderManager:
         for order in existing_orders:
             # insert into mysql
             sql = "INSERT INTO test_orders(id, price, orderBy, side, timestamp) VALUES (%d, %f, %d, '%s', now());" \
-                  % (index, order['price'], order['leavesQty'], "Buy" if index < 0 else "Sell")
+                  % (index, order['price'], order['leavesQty'], order['side'])
             index = index + 1
             try:
                 self.cursor.execute(sql)
