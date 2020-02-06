@@ -247,6 +247,8 @@ class OrderManager:
         margin = self.exchange.get_margin()
         position = self.exchange.get_position()
         instrument = self.exchange.get_instrument()
+        existing_orders = self.exchange.get_orders()
+        
         if time() > self.tickId*60:
             sql = "INSERT INTO test_0(id, markPrice, currentQty, currentCost, currentComm) VALUES (%d, %f, %d, %d, %d);" \
                   % (self.tickId, instrument['markPrice'], self.current_qty, self.current_cost, self.current_comm)
@@ -257,6 +259,7 @@ class OrderManager:
             except:
                 self.db.rollback()
             self.tickId = self.tickId+1
+
         if self.running_qty != position['currentQty'] or time()>self.end_time:
             self.end_time = time()
             start_time=strftime("%Y-%m-%d %H:%M:%S.001", gmtime(self.start_time)) 
@@ -277,6 +280,24 @@ class OrderManager:
                 self.current_comm = self.current_comm + trade["execComm"];                    
             self.start_time = self.end_time
             self.end_time = int((self.start_time+14400)/28800)*28800+14400
+
+        try:
+            self.cursor.execute("delete from test_orders;")
+            self.db.commit()
+        except:
+            self.db.rollback()
+        index = 0
+        for order in existing_orders:
+            # insert into mysql
+            sql = "INSERT INTO test_orders(id, price, orderBy, side, timestamp) VALUES (%d, %f, %d, '%s', now());" \
+                  % (index, order['price'], order['leavesQty'], "Buy" if index < 0 else "Sell")
+            index = index + 1
+            try:
+                self.cursor.execute(sql)
+                self.db.commit()
+            except:
+                self.db.rollback()
+
         self.running_qty = position['currentQty']
         tickLog = instrument['tickLog']
         self.start_XBt = margin["marginBalance"]
@@ -358,11 +379,6 @@ class OrderManager:
         buy_orders = []
         sell_orders = []
 
-        try:
-            self.cursor.execute("delete from test_orders;")
-            self.db.commit()
-        except:
-            self.db.rollback()
         # Create orders from the outside in. This is intentional - let's say the inner order gets taken;
         # then we match orders from the outside in, ensuring the fewest number of orders are amended and only
         # a new order is created in the inside. If we did it inside-out, all orders would be amended
@@ -384,16 +400,6 @@ class OrderManager:
             quantity = settings.ORDER_START_SIZE + ((abs(index) - 1) * settings.ORDER_STEP_SIZE)
 
         price = self.get_price_offset(index)
-
-        # insert into mysql
-        sql = "INSERT INTO test_orders(id, price, orderBy, side, timestamp) VALUES (%d, %f, %d, '%s', now());" \
-                  % (index, price, quantity, "Buy" if index < 0 else "Sell")
-        #logger.info(sql)
-        try:
-            self.cursor.execute(sql)
-            self.db.commit()
-        except:
-            self.db.rollback()
 
         return {'price': price, 'orderQty': quantity, 'side': "Buy" if index < 0 else "Sell"}
 
