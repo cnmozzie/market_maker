@@ -142,10 +142,12 @@ class ExchangeInterface:
             return []
         return self.bitmex.open_orders()
 
-    def get_execution_trades(self, count=1, startTime=None, endTime=None):
+    def get_execution_trades(self, symbol=None, count=1, startTime=None, endTime=None):
         if self.dry_run:
             return []
-        return self.bitmex.execution_trades(count, startTime, endTime)
+        if symbol is None:
+            symbol = self.symbol
+        return self.bitmex.execution_trades(symbol, count, startTime, endTime)
 
     def get_highest_buy(self):
         buys = [o for o in self.get_orders() if o['side'] == 'Buy']
@@ -250,7 +252,7 @@ class OrderManager:
         existing_orders = self.exchange.get_orders()
         
         if time() > self.tickId*60:
-            sql = "INSERT INTO test_0(id, markPrice, currentQty, currentCost, currentComm) VALUES (%d, %f, %d, %d, %d);" \
+            sql = "INSERT INTO main_0(id, markPrice, currentQty, currentCost, currentComm) VALUES (%d, %f, %d, %d, %d);" \
                   % (self.tickId, instrument['markPrice'], self.current_qty, self.current_cost, self.current_comm)
             logger.info(sql)
             try:
