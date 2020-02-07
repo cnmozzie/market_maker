@@ -235,6 +235,7 @@ class OrderManager:
         self.current_comm = position['currentComm']
         self.buy_order_start_size = settings.ORDER_START_SIZE
         self.sell_order_start_size = settings.ORDER_START_SIZE
+        self.restart_flag = False
 
 
     def reset(self):
@@ -290,8 +291,13 @@ class OrderManager:
             self.end_time = int((self.start_time+14400)/28800)*28800+14400
 
         if self.current_qty != position['currentQty']:
-            logger.error("Data not match, restarting...")
-            self.restart()
+            if self.restart_flag:
+                logger.error("Data not match, restarting...")
+                self.restart()
+            else:
+                self.restart_flag = True
+        else:
+            self.restart_flag = False
 
         try:
             self.cursor.execute("delete from %s;" % settings.ORDER_TABLE_NAME)
