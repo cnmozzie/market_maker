@@ -289,6 +289,10 @@ class OrderManager:
             self.start_time = self.end_time
             self.end_time = int((self.start_time+14400)/28800)*28800+14400
 
+        if self.running_qty != position['currentQty']:
+            logger.error("Data not match, restarting...")
+            self.restart()
+
         try:
             self.cursor.execute("delete from %s;" % settings.ORDER_TABLE_NAME)
             self.db.commit()
