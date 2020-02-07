@@ -233,8 +233,8 @@ class OrderManager:
         self.tickId = int(self.start_time/60)
         self.current_cost = position['currentCost']
         self.current_comm = position['currentComm']
-        self.relist_interval_buy = settings.RELIST_INTERVAL_S
-        self.relist_interval_sell = settings.RELIST_INTERVAL_S
+        self.buy_order_start_size = settings.ORDER_START_SIZE
+        self.sell_order_start_size = settings.ORDER_START_SIZE
 
 
     def reset(self):
@@ -278,13 +278,13 @@ class OrderManager:
                 if (trade["side"]=="Sell"):
                     self.current_qty = self.current_qty - trade["lastQty"];
                     self.current_cost = self.current_cost + trade["execCost"];
-                    self.relist_interval_sell = settings.RELIST_INTERVAL_L
-                    self.relist_interval_buy = settings.RELIST_INTERVAL_S
+                    self.buy_order_start_size = settings.ORDER_START_SIZE
+                    self.sell_order_start_size = self.sell_order_start_size + settings.ORDER_STEP_SIZE
                 elif (trade["side"]=="Buy"):
                     self.current_qty = self.current_qty + trade["lastQty"];
                     self.current_cost = self.current_cost + trade["execCost"];
-                    self.relist_interval_sell = settings.RELIST_INTERVAL_S
-                    self.relist_interval_buy = settings.RELIST_INTERVAL_L
+                    self.sell_order_start_size = settings.ORDER_START_SIZE
+                    self.buy_order_start_size = self.buy_order_start_size + settings.ORDER_STEP_SIZE
                 self.current_comm = self.current_comm + trade["execComm"];                    
             self.start_time = self.end_time
             self.end_time = int((self.start_time+14400)/28800)*28800+14400
@@ -405,7 +405,10 @@ class OrderManager:
         if settings.RANDOM_ORDER_SIZE is True:
             quantity = random.randint(settings.MIN_ORDER_SIZE, settings.MAX_ORDER_SIZE)
         else:
-            quantity = settings.ORDER_START_SIZE + ((abs(index) - 1) * settings.ORDER_STEP_SIZE)
+            if index < 0:
+                quantity = self.buy_order_start_size + ((abs(index) - 1) * settings.ORDER_STEP_SIZE)
+            else:
+                quantity = self.sell_order_start_size + ((abs(index) - 1) * settings.ORDER_STEP_SIZE)
 
         price = self.get_price_offset(index)
 
@@ -431,17 +434,15 @@ class OrderManager:
                 if order['side'] == 'Buy':
                     desired_order = buy_orders[buys_matched]
                     buys_matched += 1
-                    relist_interval = self.relist_interval_buy
                 else:
                     desired_order = sell_orders[sells_matched]
                     sells_matched += 1
-                    relist_interval = self.relist_interval_sell
 
                 # Found an existing order. Do we need to amend it?
                 if desired_order['orderQty'] != order['leavesQty'] or (
                         # If price has changed, and the change is more than our RELIST_INTERVAL, amend.
                         desired_order['price'] != order['price'] and
-                        abs((desired_order['price'] / order['price']) - 1) > relist_interval):
+                        abs((desired_order['price'] / order['price']) - 1) > settings.RELIST_INTERVAL):
                     to_amend.append({'orderID': order['orderID'], 'orderQty': order['cumQty'] + desired_order['orderQty'],
                                      'price': desired_order['price'], 'side': order['side']})
             except IndexError:
