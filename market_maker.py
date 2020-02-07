@@ -264,7 +264,7 @@ class OrderManager:
                 self.db.rollback()
             self.tickId = self.tickId+1
 
-        if self.running_qty != position['currentQty'] or time()>self.end_time:
+        if self.current_qty != position['currentQty'] or time()>self.end_time:
             self.end_time = time()
             start_time=strftime("%Y-%m-%d %H:%M:%S.001", gmtime(self.start_time)) 
             end_time=strftime("%Y-%m-%d %H:%M:%S.000", gmtime(self.end_time)) 
@@ -289,7 +289,7 @@ class OrderManager:
             self.start_time = self.end_time
             self.end_time = int((self.start_time+14400)/28800)*28800+14400
 
-        if self.running_qty != position['currentQty']:
+        if self.current_qty != position['currentQty']:
             logger.error("Data not match, restarting...")
             self.restart()
 
