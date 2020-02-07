@@ -254,8 +254,8 @@ class OrderManager:
         existing_orders = self.exchange.get_orders()
         
         if time() > self.tickId*60:
-            sql = "INSERT INTO main_0(id, markPrice, currentQty, currentCost, currentComm) VALUES (%d, %f, %d, %d, %d);" \
-                  % (self.tickId, instrument['markPrice'], self.current_qty, self.current_cost, self.current_comm)
+            sql = "INSERT INTO %s (id, markPrice, currentQty, currentCost, currentComm) VALUES (%d, %f, %d, %d, %d);" \
+                  % (settings.POSITION_TABLE_NAME, self.tickId, instrument['markPrice'], self.current_qty, self.current_cost, self.current_comm)
             logger.info(sql)
             try:
                 self.cursor.execute(sql)
@@ -290,15 +290,15 @@ class OrderManager:
             self.end_time = int((self.start_time+14400)/28800)*28800+14400
 
         try:
-            self.cursor.execute("delete from test_orders;")
+            self.cursor.execute("delete from %s;" % settings.ORDER_TABLE_NAME)
             self.db.commit()
         except:
             self.db.rollback()
         index = 0
         for order in existing_orders:
             # insert into mysql
-            sql = "INSERT INTO test_orders(id, price, orderBy, side, timestamp) VALUES (%d, %f, %d, '%s', now());" \
-                  % (index, order['price'], order['leavesQty'], order['side'])
+            sql = "INSERT INTO %s (id, price, orderBy, side, timestamp) VALUES (%d, %f, %d, '%s', now());" \
+                  % (settings.ORDER_TABLE_NAME, index, order['price'], order['leavesQty'], order['side'])
             index = index + 1
             try:
                 self.cursor.execute(sql)
