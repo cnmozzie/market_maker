@@ -220,9 +220,7 @@ class OrderManager:
         else:
             logger.info("Order Manager initializing, connecting to BitMEX. Live run: executing real trades.")
 
-        self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex_test", charset='utf8' )
-        # self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
-        self.cursor = self.db.cursor()
+        
         self.start_time = time()
         self.end_time = int((self.start_time+14400)/28800)*28800+14400
         self.instrument = self.exchange.get_instrument()
@@ -235,7 +233,24 @@ class OrderManager:
         self.current_comm = position['currentComm']
         self.buy_order_start_size = settings.ORDER_START_SIZE
         self.sell_order_start_size = settings.ORDER_START_SIZE
-        self.restart_flag = False
+        self.record = False
+        
+        self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex_test", charset='utf8' )
+        # self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
+        self.cursor = self.db.cursor()
+        sql = "select * from %s order by id desc limit 1;" % settings.POSITION_TABLE_NAME
+        try:
+            self.cursor.execute(sql)
+            results = self.cursor.fetchall()
+            for row in results:
+                self.current_qty = row[2]
+                self.current_cost = row[3]
+                self.current_comm = row[4]
+                self.start_time = row[5]
+        except:
+            logger.info("Error: unable to fecth data")
+
+        self.record_time = self.start_time
 
 
     def reset(self):
@@ -255,8 +270,9 @@ class OrderManager:
         existing_orders = self.exchange.get_orders()
         
         if time() > self.tickId*60:
-            sql = "INSERT INTO %s (id, markPrice, currentQty, currentCost, currentComm) VALUES (%d, %f, %d, %d, %d);" \
-                  % (settings.POSITION_TABLE_NAME, self.tickId, instrument['markPrice'], self.current_qty, self.current_cost, self.current_comm)
+            sql = "INSERT INTO %s (id, markPrice, currentQty, currentCost, currentComm, recordTime) VALUES (%d, %f, %d, %d, %d, %d);" \
+                  % (settings.POSITION_TABLE_NAME, self.tickId, instrument['markPrice'], \
+                     self.current_qty, self.current_cost, self.current_comm, self.record_time)
             logger.info(sql)
             try:
                 self.cursor.execute(sql)
@@ -272,6 +288,7 @@ class OrderManager:
             logger.info("start time: %s; end time: %s" % (start_time, end_time))
             logger.info("Get trades now.") #temp
             for trade in self.exchange.get_execution_trades(count=100, startTime=start_time, endTime=end_time): #temp
+                self.record = True
                 trade_message = "(symbol: %s, side: %s, lastQty: %d, lastPx: %f , execComm: %d, execCost: %d, transactTime: %s)" % \
                       (trade["symbol"], trade["side"], trade["lastQty"],
                        trade["lastPx"], trade["execComm"], trade["execCost"], trade["transactTime"][:23])
@@ -286,18 +303,14 @@ class OrderManager:
                     self.current_cost = self.current_cost + trade["execCost"];
                     self.sell_order_start_size = settings.ORDER_START_SIZE
                     self.buy_order_start_size = self.buy_order_start_size + settings.ORDER_STEP_SIZE
-                self.current_comm = self.current_comm + trade["execComm"];                    
-            self.start_time = self.end_time
-            self.end_time = int((self.start_time+14400)/28800)*28800+14400
+                self.current_comm = self.current_comm + trade["execComm"];
+            if self.record:
+                self.record = False
+                self.record_time = self.end_time
+                self.start_time = self.end_time
+                self.end_time = int((self.start_time+14400)/28800)*28800+14400
 
-        if self.current_qty != position['currentQty']:
-            if self.restart_flag:
-                logger.error("Data not match, restarting...")
-                self.restart()
-            else:
-                self.restart_flag = True
-        else:
-            self.restart_flag = False
+
 
         try:
             self.cursor.execute("delete from %s;" % settings.ORDER_TABLE_NAME)
