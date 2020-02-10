@@ -207,7 +207,7 @@ class BitMEX(object):
         return self._curl_bitmex(path=path, postdict=postdict, verb="DELETE")
 
     @authentication_required
-    def execution_trades(self, symbol, count=1, startTime=None, endTime=None):
+    def execution_trades(self, symbol, count=1, startTime=None, endTime=None, rethrow_errors=True):
         """Get all balance-affecting executions. This includes each trade, insurance charge, and settlement."""
         path = "execution/tradeHistory"
         postdict = {
@@ -216,7 +216,7 @@ class BitMEX(object):
             'startTime': startTime,
             'endTime': endTime
         }
-        return self._curl_bitmex(path=path, postdict=postdict, verb="GET")
+        return self._curl_bitmex(path=path, postdict=postdict, verb="GET", rethrow_errors=rethrow_errors)
 
     @authentication_required
     def withdraw(self, amount, fee, address):
