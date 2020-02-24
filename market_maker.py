@@ -233,7 +233,7 @@ class OrderManager:
         self.current_comm = position['currentComm']
         self.buy_order_start_size = settings.ORDER_START_SIZE
         self.sell_order_start_size = settings.ORDER_START_SIZE
-        self.record = False
+        self.base_price = self.instrument['markPrice']
         
         self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex_test", charset='utf8' )
         # self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
@@ -243,13 +243,14 @@ class OrderManager:
             self.cursor.execute(sql)
             results = self.cursor.fetchall()
             for row in results:
+                self.base_price = row[1]
                 self.current_qty = row[2]
                 self.current_cost = row[3]
                 self.current_comm = row[4]
                 self.start_time = row[5]
         except:
             logger.info("Error: unable to fecth data")
-
+        
         self.record_time = self.start_time
 
 
@@ -279,7 +280,8 @@ class OrderManager:
                 self.db.commit()
             except:
                 self.db.rollback()
-            self.tickId = self.tickId+1
+            self.tickId = self.tickId + 1
+            self.base_price = self.base_price * 0.9 + instrument['markPrice'] * 0.1
 
         if self.current_qty != position['currentQty'] or time()>self.end_time:
             self.end_time = time()
@@ -288,7 +290,6 @@ class OrderManager:
             logger.info("start time: %s; end time: %s" % (start_time, end_time))
             logger.info("Get trades now.") #temp
             for trade in self.exchange.get_execution_trades(count=100, startTime=start_time, endTime=end_time): #temp
-                self.record = True
                 trade_message = "(symbol: %s, side: %s, lastQty: %d, lastPx: %f , execComm: %d, execCost: %d, transactTime: %s)" % \
                       (trade["symbol"], trade["side"], trade["lastQty"],
                        trade["lastPx"], trade["execComm"], trade["execCost"], trade["transactTime"][:23])
@@ -304,8 +305,7 @@ class OrderManager:
                     self.sell_order_start_size = settings.ORDER_START_SIZE
                     self.buy_order_start_size = self.buy_order_start_size + settings.ORDER_STEP_SIZE
                 self.current_comm = self.current_comm + trade["execComm"];
-            if self.record:
-                self.record = False
+            if self.current_qty == position['currentQty']:
                 self.record_time = self.end_time
                 self.start_time = self.end_time
                 self.end_time = int((self.start_time+14400)/28800)*28800+14400
@@ -333,6 +333,7 @@ class OrderManager:
         tickLog = instrument['tickLog']
         self.start_XBt = margin["marginBalance"]
 
+        logger.info("Current Base Price: %.*f" % (tickLog, float(self.base_price)))
         logger.info("Current XBT Balance: %.6f" % XBt_to_XBT(self.start_XBt))
         logger.info("Current Contract Position: %d" % self.running_qty)
         if settings.CHECK_POSITION_LIMITS:
@@ -345,7 +346,7 @@ class OrderManager:
 
     def get_ticker(self):
         ticker = self.exchange.get_ticker()
-        tickLog = self.exchange.get_instrument()['tickLog']
+        tickLog = self.instrument['tickLog']
 
         # Set up our buy & sell positions as the smallest possible unit above and below the current spread
         # and we'll work out from there. That way we always have the best price but we don't kill wide
@@ -366,6 +367,12 @@ class OrderManager:
         if self.start_position_buy * (1.00 + settings.MIN_SPREAD) > self.start_position_sell:
             self.start_position_buy *= (1.00 - (settings.MIN_SPREAD / 2))
             self.start_position_sell *= (1.00 + (settings.MIN_SPREAD / 2))
+
+        # If the price changing too quickly, wait...
+        if self.start_position_sell < self.base_price * 0.99:
+            self.start_position_sell = self.base_price * 0.99
+        if self.start_position_buy > self.base_price * 1.01:
+            self.start_position_buy = self.base_price * 1.01
 
         # Midpoint, used for simpler order placement.
         self.start_position_mid = ticker["mid"]
@@ -442,7 +449,7 @@ class OrderManager:
            This involves amending any open orders and creating new ones if any have filled completely.
            We start from the closest orders outward."""
 
-        tickLog = self.exchange.get_instrument()['tickLog']
+        tickLog = self.instrument['tickLog']
         to_amend = []
         to_create = []
         to_cancel = []
