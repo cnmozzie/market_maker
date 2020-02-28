@@ -281,7 +281,7 @@ class OrderManager:
             except:
                 self.db.rollback()
             self.tickId = self.tickId + 1
-            self.base_price = self.base_price * 0.9 + instrument['markPrice'] * 0.1
+            self.base_price = self.base_price * settings.BASE_PRICE_FACTOR + instrument['markPrice'] * (1 - settings.BASE_PRICE_FACTOR)
 
         if self.current_qty != position['currentQty'] or time()>self.end_time:
             self.end_time = time()
