@@ -234,6 +234,7 @@ class OrderManager:
         self.buy_order_start_size = settings.ORDER_START_SIZE
         self.sell_order_start_size = settings.ORDER_START_SIZE
         self.base_price = self.instrument['markPrice']
+        self.interval_factor = 1.0
         
         self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex_test", charset='utf8' )
         # self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
@@ -332,8 +333,10 @@ class OrderManager:
         self.running_qty = position['currentQty']
         tickLog = instrument['tickLog']
         self.start_XBt = margin["marginBalance"]
+        self.interval_factor = math.harmonicFactor(self.running_qty, settings.MIN_POSITION, settings.MAX_POSITION)
 
         logger.info("Current Base Price: %.*f" % (tickLog, float(self.base_price)))
+        logger.info("Current Interval Factor: %.*f" % (2, float(self.interval_factor)))
         logger.info("Current XBT Balance: %.6f" % XBt_to_XBT(self.start_XBt))
         logger.info("Current Contract Position: %d" % self.running_qty)
         if settings.CHECK_POSITION_LIMITS:
@@ -364,9 +367,9 @@ class OrderManager:
                 self.start_position_sell = ticker["sell"]
 
         # Back off if our spread is too small.
-        if self.start_position_buy * (1.00 + settings.MIN_SPREAD) > self.start_position_sell:
-            self.start_position_buy *= (1.00 - (settings.MIN_SPREAD / 2))
-            self.start_position_sell *= (1.00 + (settings.MIN_SPREAD / 2))
+        if self.start_position_buy * (1.00 + settings.MIN_SPREAD * self.interval_factor) > self.start_position_sell:
+            self.start_position_buy *= (1.00 - (settings.MIN_SPREAD * self.interval_factor / 2))
+            self.start_position_sell *= (1.00 + (settings.MIN_SPREAD * self.interval_factor / 2))
 
         # If the price changing too quickly, wait...
         if self.start_position_sell < self.base_price * 0.99:
@@ -405,7 +408,7 @@ class OrderManager:
             if index < 0 and start_position > self.start_position_sell:
                 start_position = self.start_position_buy
 
-        return math.toNearest(start_position * (1 + settings.INTERVAL) ** index, self.instrument['tickSize'])
+        return math.toNearest(start_position * (1 + settings.INTERVAL * self.interval_factor) ** index, self.instrument['tickSize'])
 
     ###
     # Orders
@@ -472,7 +475,7 @@ class OrderManager:
                 if desired_order['orderQty'] != order['leavesQty'] or (
                         # If price has changed, and the change is more than our RELIST_INTERVAL, amend.
                         desired_order['price'] != order['price'] and
-                        abs((desired_order['price'] / order['price']) - 1) > settings.RELIST_INTERVAL):
+                        abs((desired_order['price'] / order['price']) - 1) > settings.RELIST_INTERVAL * self.interval_factor):
                     to_amend.append({'orderID': order['orderID'], 'orderQty': order['cumQty'] + desired_order['orderQty'],
                                      'price': desired_order['price'], 'side': order['side']})
             except IndexError:

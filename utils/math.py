@@ -7,3 +7,14 @@ def toNearest(num, tickSize):
        Use this after adding/subtracting/multiplying numbers."""
     tickDec = Decimal(str(tickSize))
     return float((Decimal(round(num / tickSize, 0)) * tickDec))
+
+def harmonicFactor(num, minimum, maximum):
+    """Given a number, return a factor that indicate how close it is from the 
+       minimum and maximum. It's set to range from 0.25 to 1."""
+    interval = maximum - minimum
+    a = (num - minimum) / interval
+    b = (maximum - num) / interval
+    if (a < 0.067 or b < 0.067): 
+        return 0.25
+    else:
+       return 4/(1/a+1/b)
