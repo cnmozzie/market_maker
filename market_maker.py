@@ -235,6 +235,7 @@ class OrderManager:
         self.sell_order_start_size = settings.ORDER_START_SIZE
         self.base_price = self.instrument['markPrice']
         self.interval_factor = 1.0
+        self.next_place_order_time = 0
         
         self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex_test", charset='utf8' )
         # self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
@@ -310,8 +311,19 @@ class OrderManager:
                 self.record_time = self.end_time
                 self.start_time = self.end_time
                 self.end_time = int((self.start_time+14400)/28800)*28800+14400
-
-
+            else:
+                try:
+                    self.sell_order_start_size = settings.ORDER_START_SIZE
+                    self.buy_order_start_size = settings.ORDER_START_SIZE
+                    self.cursor.execute("delete from %s where id = (select id from %s order by id desc limit 1);" \
+                                        % (settings.POSITION_TABLE_NAME, settings.POSITION_TABLE_NAME))
+                    self.db.commit()
+                    self.cursor.execute("delete from %s where id = (select id from %s order by id desc limit 1);" \
+                                        % (settings.POSITION_TABLE_NAME, settings.POSITION_TABLE_NAME))
+                    self.db.commit()
+                except:
+                    self.db.rollback()
+                self.restart()
 
         try:
             self.cursor.execute("delete from %s;" % settings.ORDER_TABLE_NAME)
@@ -623,7 +635,12 @@ class OrderManager:
 
             self.sanity_check()  # Ensures health of mm - several cut-out points here
             self.print_status()  # Print skew, delta, etc
-            self.place_orders()  # Creates desired orders and converges to existing orders
+            if self.next_place_order_time > 0:
+                self.next_place_order_time = self.next_place_order_time - 1
+                logger.info("Next time to place order: %d" % self.next_place_order_time)
+            else:
+                self.next_place_order_time = 30
+                self.place_orders()  # Creates desired orders and converges to existing orders
 
     def restart(self):
         logger.info("Restarting the market maker...")
