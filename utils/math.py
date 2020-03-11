@@ -9,18 +9,12 @@ def toNearest(num, tickSize):
     return float((Decimal(round(num / tickSize, 0)) * tickDec))
 
 def harmonicFactor(num, minimum, maximum):
-    """Given a number, return a buy factor and a sell factor that indicate how close it 
+    """Given a number, return a factor that indicate how close it 
        is from the minimum and maximum. It's set to range from 0.25 to 1."""
     interval = maximum - minimum
     a = (num - minimum) / interval
     b = (maximum - num) / interval
-    if a < b: # need to buy more
-        if a < 0.067:
-            return (0.25, 4)
-        else:
-            return (4/(1/a+1/b), (1/a+1/b)/4)
-    else: # need to sell more
-        if b < 0.067:
-            return (4, 0.25)
-        else:
-            return ((1/a+1/b)/4, 4/(1/a+1/b))
+    if a < 0.067 or b < 0.067:
+        return 0.25
+    else:
+        return 4/(1/a+1/b)
