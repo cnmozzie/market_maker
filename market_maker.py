@@ -243,18 +243,18 @@ class OrderManager:
         self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex_test", charset='utf8' )
         # self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
         self.cursor = self.db.cursor()
-        sql = "select * from %s order by id desc limit 1;" % settings.POSITION_TABLE_NAME
-        try:
-            self.cursor.execute(sql)
-            results = self.cursor.fetchall()
-            for row in results:
-                self.base_price = row[1]
-                self.current_qty = row[2]
-                self.current_cost = row[3]
-                self.current_comm = row[4]
-                self.start_time = row[5]
-        except:
-            logger.info("Error: unable to fecth data")
+        #sql = "select * from %s order by id desc limit 1;" % settings.POSITION_TABLE_NAME
+        #try:
+        #    self.cursor.execute(sql)
+        #    results = self.cursor.fetchall()
+        #    for row in results:
+        #        self.base_price = row[1]
+        #        self.current_qty = row[2]
+        #        self.current_cost = row[3]
+        #        self.current_comm = row[4]
+        #        self.start_time = row[5]
+        #except:
+        #    logger.info("Error: unable to fecth data")
         
         self.record_time = self.start_time
 
