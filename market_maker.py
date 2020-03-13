@@ -235,7 +235,10 @@ class OrderManager:
         self.sell_order_start_size = settings.ORDER_START_SIZE
         self.base_price = self.instrument['markPrice']
         self.interval_factor = 1.0
-        self.next_place_order_time = 0
+        self.relist = True
+        self.target_usd = 0.0
+        self.target_xbt = 0.0
+        self.mid_qty = 0
         
         self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex_test", charset='utf8' )
         # self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
@@ -269,13 +272,17 @@ class OrderManager:
 
         margin = self.exchange.get_margin()
         position = self.exchange.get_position()
-        instrument = self.exchange.get_instrument()
+        self.instrument = self.exchange.get_instrument()
         existing_orders = self.exchange.get_orders()
+
+        self.running_qty = position['currentQty']
+        tickLog = self.instrument['tickLog']
+        self.start_XBt = margin["marginBalance"]
         
         if time() > self.tickId*60:
-            sql = "INSERT INTO %s (id, markPrice, currentQty, currentCost, currentComm, recordTime) VALUES (%d, %f, %d, %d, %d, %d);" \
-                  % (settings.POSITION_TABLE_NAME, self.tickId, instrument['markPrice'], \
-                     self.current_qty, self.current_cost, self.current_comm, self.record_time)
+            sql = "INSERT INTO %s (id, markPrice, currentQty, totalXBT, currentCost, currentComm, recordTime) VALUES (%d, %f, %d, %d, %d, %d, %d);" \
+                  % (settings.POSITION_TABLE_NAME, self.tickId, self.instrument['markPrice'], \
+                     self.current_qty, self.start_XBt, self.current_cost, self.current_comm, self.record_time)
             logger.info(sql)
             try:
                 self.cursor.execute(sql)
@@ -283,7 +290,7 @@ class OrderManager:
             except:
                 self.db.rollback()
             self.tickId = self.tickId + 1
-            self.base_price = self.base_price * settings.BASE_PRICE_FACTOR + instrument['markPrice'] * (1 - settings.BASE_PRICE_FACTOR)
+            self.base_price = self.base_price * settings.BASE_PRICE_FACTOR + self.instrument['markPrice'] * (1 - settings.BASE_PRICE_FACTOR)
 
         if self.current_qty != position['currentQty'] or time()>self.end_time:
             self.end_time = time()
@@ -311,6 +318,8 @@ class OrderManager:
                 self.record_time = self.end_time
                 self.start_time = self.end_time
                 self.end_time = int((self.start_time+14400)/28800)*28800+14400
+                if abs(self.current_qty-self.mid_qty) < 12:
+                    self.relist = True
             else:
                 try:
                     self.sell_order_start_size = settings.ORDER_START_SIZE
@@ -342,15 +351,21 @@ class OrderManager:
             except:
                 self.db.rollback()
 
-        self.running_qty = position['currentQty']
-        tickLog = instrument['tickLog']
-        self.start_XBt = margin["marginBalance"]
-        self.interval_factor = math.harmonicFactor(self.running_qty, settings.MIN_POSITION, settings.MAX_POSITION)
-        if (position['currentQty'] * (position['avgCostPrice']-instrument['markPrice']) < 0):
-            self.interval_factor = 1 / self.interval_factor
+        
+        self.interval_factor = 1 / math.harmonicFactor(self.running_qty, settings.MIN_POSITION, settings.MAX_POSITION)
+        #if (position['currentQty'] * (position['avgCostPrice']-instrument['markPrice']) < 0):
+        #    self.interval_factor = 1 / self.interval_factor
+        if self.relist:
+            self.relist = False
+            self.target_xbt = self.start_XBt
+            self.target_usd = int(self.instrument['markPrice'] * XBt_to_XBT(self.start_XBt))
+            self.mid_qty = -int(self.target_usd / 2)
 
-        logger.info("Current Base Price: %.*f" % (tickLog, float(self.base_price)))
+        logger.info("Current Mark Price: %.*f" % (tickLog, float(self.instrument['markPrice'])))
         logger.info("Current Interval Factor: %.*f" % (2, float(self.interval_factor)))
+        logger.info("Target XBT Balance: %.6f" % XBt_to_XBT(self.target_xbt))
+        logger.info("Target USD Balance: %d" % self.target_usd)
+        logger.info("Mid Quantity: %d" % self.mid_qty)
         logger.info("Current XBT Balance: %.6f" % XBt_to_XBT(self.start_XBt))
         logger.info("Current Contract Position: %d" % self.running_qty)
         if settings.CHECK_POSITION_LIMITS:
@@ -444,6 +459,25 @@ class OrderManager:
             if not self.short_position_limit_exceeded():
                 sell_orders.append(self.prepare_order(i))
 
+        hold_xbt = self.start_XBt - self.current_cost
+        if self.current_qty-self.mid_qty > 10:
+            if self.current_qty > 0 and hold_xbt > self.target_xbt and self.start_XBt < self.target_xbt:
+                quantity = self.current_qty + 8
+                price = math.toNearest(self.current_qty / XBt_to_XBT(hold_xbt-self.target_xbt), self.instrument['tickSize'])
+                sell_orders.append({'price': price, 'orderQty': quantity, 'side': "Sell"})
+            elif self.target_usd+self.current_qty>0 and hold_xbt > 0 and self.instrument['markPrice']*XBt_to_XBT(self.start_XBt) < self.target_usd:
+                quantity = self.current_qty - self.mid_qty + 8
+                price = math.toNearest((self.target_usd+self.current_qty) / XBt_to_XBT(hold_xbt), self.instrument['tickSize'])
+                sell_orders.append({'price': price, 'orderQty': quantity, 'side': "Sell"})
+        if self.current_qty-self.mid_qty < -10:
+            if self.target_usd+self.current_qty<0 and hold_xbt < 0 and self.instrument['markPrice']*XBt_to_XBT(self.start_XBt) < self.target_usd:
+                quantity = self.current_qty + 8
+                price = math.toNearest((self.target_usd+self.current_qty) / XBt_to_XBT(hold_xbt), self.instrument['tickSize'])
+                buy_orders.append({'price': price, 'orderQty': quantity, 'side': "Buy"})
+            elif hold_xbt < self.target_xbt and self.start_XBt < self.target_xbt:
+                quantity = self.mid_qty - self.current_qty + 8
+                price = math.toNearest(self.current_qty / XBt_to_XBT(hold_xbt-self.target_xbt), self.instrument['tickSize'])
+                buy_orders.append({'price': price, 'orderQty': quantity, 'side': "Buy"})
         return self.converge_orders(buy_orders, sell_orders)
 
     def prepare_order(self, index):
@@ -637,12 +671,7 @@ class OrderManager:
 
             self.sanity_check()  # Ensures health of mm - several cut-out points here
             self.print_status()  # Print skew, delta, etc
-            if self.next_place_order_time > 0:
-                self.next_place_order_time = self.next_place_order_time - 1
-                logger.info("Next time to place order: %d" % self.next_place_order_time)
-            else:
-                self.next_place_order_time = 10
-                self.place_orders()  # Creates desired orders and converges to existing orders
+            self.place_orders()  # Creates desired orders and converges to existing orders
 
     def restart(self):
         logger.info("Restarting the market maker...")
