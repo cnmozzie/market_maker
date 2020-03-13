@@ -430,6 +430,7 @@ class OrderManager:
         else:
             # Offset mode: ticker comes from a reference exchange and we define an offset.
             start_position = self.start_position_buy if index < 0 else self.start_position_sell
+            index = index + 1 if index < 0 else index - 1
 
             # If we're attempting to sell, but our sell price is actually lower than the buy,
             # move over to the sell side.
