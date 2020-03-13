@@ -464,20 +464,32 @@ class OrderManager:
             if self.current_qty > 0 and hold_xbt > self.target_xbt and self.start_XBt < self.target_xbt:
                 quantity = self.current_qty + 8
                 price = math.toNearest(self.current_qty / XBt_to_XBT(hold_xbt-self.target_xbt), self.instrument['tickSize'])
-                sell_orders.append({'price': price, 'orderQty': quantity, 'side': "Sell"})
+                if (price > self.start_position_sell):
+                    sell_orders.append({'price': price, 'orderQty': quantity, 'side': "Sell"})
+                else:
+                    logger.info("Want to sell %d @ %f" % (quantity, price))
             elif self.target_usd+self.current_qty>0 and hold_xbt > 0 and self.instrument['markPrice']*XBt_to_XBT(self.start_XBt) < self.target_usd:
                 quantity = self.current_qty - self.mid_qty + 8
                 price = math.toNearest((self.target_usd+self.current_qty) / XBt_to_XBT(hold_xbt), self.instrument['tickSize'])
-                sell_orders.append({'price': price, 'orderQty': quantity, 'side': "Sell"})
+                if (price > self.start_position_sell):
+                    sell_orders.append({'price': price, 'orderQty': quantity, 'side': "Sell"})
+                else:
+                    logger.info("Want to sell %d @ %f" % (quantity, price))
         if self.current_qty-self.mid_qty < -10:
             if self.target_usd+self.current_qty<0 and hold_xbt < 0 and self.instrument['markPrice']*XBt_to_XBT(self.start_XBt) < self.target_usd:
                 quantity = self.current_qty + 8
                 price = math.toNearest((self.target_usd+self.current_qty) / XBt_to_XBT(hold_xbt), self.instrument['tickSize'])
-                buy_orders.append({'price': price, 'orderQty': quantity, 'side': "Buy"})
+                if (price < self.start_position_buy):
+                    buy_orders.append({'price': price, 'orderQty': quantity, 'side': "Buy"})
+                else:
+                    logger.info("Want to buy %d @ %f" % (quantity, price))
             elif hold_xbt < self.target_xbt and self.start_XBt < self.target_xbt:
                 quantity = self.mid_qty - self.current_qty + 8
                 price = math.toNearest(self.current_qty / XBt_to_XBT(hold_xbt-self.target_xbt), self.instrument['tickSize'])
-                buy_orders.append({'price': price, 'orderQty': quantity, 'side': "Buy"})
+                if (price < self.start_position_buy):
+                    buy_orders.append({'price': price, 'orderQty': quantity, 'side': "Buy"})
+                else:
+                    logger.info("Want to buy %d @ %f" % (quantity, price))
         return self.converge_orders(buy_orders, sell_orders)
 
     def prepare_order(self, index):
