@@ -239,6 +239,7 @@ class OrderManager:
         self.target_usd = 0.0
         self.target_xbt = 0.0
         self.mid_qty = 0
+        self.smart_order = None
         
         self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex_test", charset='utf8' )
         # self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
@@ -298,6 +299,7 @@ class OrderManager:
             end_time=strftime("%Y-%m-%d %H:%M:%S.000", gmtime(self.end_time)) 
             logger.info("start time: %s; end time: %s" % (start_time, end_time))
             logger.info("Get trades now.") #temp
+            self.smart_order = None
             for trade in self.exchange.get_execution_trades(count=100, startTime=start_time, endTime=end_time): #temp
                 trade_message = "(symbol: %s, side: %s, lastQty: %d, lastPx: %f , execComm: %d, execCost: %d, transactTime: %s)" % \
                       (trade["symbol"], trade["side"], trade["lastQty"],
@@ -467,14 +469,14 @@ class OrderManager:
                 if (price < self.start_position_sell):
                     logger.info("Want to sell %d @ %f" % (quantity, price))
                     price = self.start_position_sell
-                sell_orders.append({'price': math.toNearest(price, self.instrument['tickSize']), 'orderQty': quantity, 'side': "Sell"})
+                self.smart_order = {'price': math.toNearest(price, self.instrument['tickSize']), 'orderQty': quantity, 'side': "Sell"}
             elif self.target_usd+self.current_qty>0 and hold_xbt > 0 and self.instrument['markPrice']*XBt_to_XBT(self.start_XBt) < self.target_usd:
                 quantity = self.current_qty - self.mid_qty + 8
                 price = (self.target_usd+self.current_qty) / XBt_to_XBT(hold_xbt)
                 if (price < self.start_position_sell):
                     logger.info("Want to sell %d @ %f" % (quantity, price))
                     price = self.start_position_sell
-                sell_orders.append({'price': math.toNearest(price, self.instrument['tickSize']), 'orderQty': quantity, 'side': "Sell"})
+                self.smart_order = {'price': math.toNearest(price, self.instrument['tickSize']), 'orderQty': quantity, 'side': "Sell"}
         if self.current_qty-self.mid_qty < -10:
             if self.target_usd+self.current_qty<0 and hold_xbt < 0 and self.instrument['markPrice']*XBt_to_XBT(self.start_XBt) < self.target_usd:
                 quantity = self.current_qty + 8
@@ -482,14 +484,19 @@ class OrderManager:
                 if (price > self.start_position_buy):
                     logger.info("Want to buy %d @ %f" % (quantity, price))
                     price = self.start_position_buy
-                buy_orders.append({'price': math.toNearest(price, self.instrument['tickSize']), 'orderQty': quantity, 'side': "Buy"})
+                self.smart_order = {'price': math.toNearest(price, self.instrument['tickSize']), 'orderQty': quantity, 'side': "Buy"}
             elif hold_xbt < self.target_xbt and self.start_XBt < self.target_xbt:
                 quantity = self.mid_qty - self.current_qty + 8
                 price = self.current_qty / XBt_to_XBT(hold_xbt-self.target_xbt)
                 if (price > self.start_position_buy):
                     logger.info("Want to buy %d @ %f" % (quantity, price))
                     price = self.start_position_buy
-                buy_orders.append({'price': math.toNearest(price, self.instrument['tickSize']), 'orderQty': quantity, 'side': "Buy"})
+                self.smart_order = {'price': math.toNearest(price, self.instrument['tickSize']), 'orderQty': quantity, 'side': "Buy"}
+        if self.smart_order:
+            if self.smart_order['side'] == 'Buy':
+                buy_orders.append(self.smart_order)
+            else:
+                sell_orders.append(self.smart_order)
         return self.converge_orders(buy_orders, sell_orders)
 
     def prepare_order(self, index):
