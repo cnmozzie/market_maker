@@ -426,7 +426,7 @@ class OrderManager:
         if settings.MAINTAIN_SPREADS:
             start_position = self.start_position_buy if index < 0 else self.start_position_sell
             # First positions (index 1, -1) should start right at start_position, others should branch from there
-            index = index + 2 if index < 0 else index - 2
+            # index = index + 1 if index < 0 else index - 1
         else:
             # Offset mode: ticker comes from a reference exchange and we define an offset.
             start_position = self.start_position_buy if index < 0 else self.start_position_sell
