@@ -244,18 +244,18 @@ class OrderManager:
         self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex_test", charset='utf8' )
         # self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
         self.cursor = self.db.cursor()
-        #sql = "select * from %s order by id desc limit 1;" % settings.POSITION_TABLE_NAME
-        #try:
-        #    self.cursor.execute(sql)
-        #    results = self.cursor.fetchall()
-        #    for row in results:
-        #        self.base_price = row[1]
-        #        self.current_qty = row[2]
-        #        self.current_cost = row[3]
-        #        self.current_comm = row[4]
-        #        self.start_time = row[5]
-        #except:
-        #    logger.info("Error: unable to fecth data")
+        sql = "select * from %s order by id desc limit 1;" % settings.POSITION_TABLE_NAME
+        try:
+            self.cursor.execute(sql)
+            results = self.cursor.fetchall()
+            for row in results:
+                self.relist = False
+                self.base_price = row[1]
+                self.target_xbt = row[3]
+                self.target_usd = int(self.base_price * XBt_to_XBT(self.target_xbt))
+                self.mid_qty = -int(self.target_usd / 2)
+        except:
+            logger.info("Error: unable to fecth data")
         
         self.record_time = self.start_time
 
@@ -369,6 +369,7 @@ class OrderManager:
         logger.info("Target USD Balance: %d" % self.target_usd)
         logger.info("Mid Quantity: %d" % self.mid_qty)
         logger.info("Current XBT Balance: %.6f" % XBt_to_XBT(self.start_XBt))
+        logger.info("Current USD Balance: %.*f" % (2, self.instrument['markPrice'] * XBt_to_XBT(self.start_XBt)))
         logger.info("Current Contract Position: %d" % self.running_qty)
         if settings.CHECK_POSITION_LIMITS:
             logger.info("Position limits: %d/%d" % (settings.MIN_POSITION, settings.MAX_POSITION))
