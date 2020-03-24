@@ -250,9 +250,8 @@ class OrderManager:
             results = self.cursor.fetchall()
             for row in results:
                 self.relist = False
-                self.base_price = row[1]
-                self.target_xbt = row[3]
-                self.target_usd = int(self.base_price * XBt_to_XBT(self.target_xbt))
+                self.target_xbt = row[5]
+                self.target_usd = row[3]
                 self.mid_qty = -int(self.target_usd / 2)
         except:
             logger.info("Error: unable to fecth data")
@@ -281,9 +280,10 @@ class OrderManager:
         self.start_XBt = margin["marginBalance"]
         
         if time() > self.tickId*60:
-            sql = "INSERT INTO %s (id, markPrice, currentQty, totalXBT, currentCost, currentComm, recordTime) VALUES (%d, %f, %d, %d, %d, %d, %d);" \
-                  % (settings.POSITION_TABLE_NAME, self.tickId, self.instrument['markPrice'], \
-                     self.current_qty, self.start_XBt, self.current_cost, self.current_comm, self.record_time)
+            sql = "INSERT INTO %s (id, markPrice, currentQty, targetUSD, totalXBT, targetXBT, currentCost, \
+                   currentComm, recordTime) VALUES (%d, %f, %d, %d, %d, %d, %d, %d, %d);" \
+                  % (settings.POSITION_TABLE_NAME, self.tickId, self.instrument['markPrice'], self.current_qty, self.target_usd, \
+                     self.start_XBt, self.target_xbt, self.current_cost, self.current_comm, self.record_time)
             logger.info(sql)
             try:
                 self.cursor.execute(sql)
