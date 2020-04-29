@@ -91,6 +91,16 @@ class BitMEX(object):
         """
         return self.ws.recent_trades()
 
+    def trade_bucketed(self, symbol, binSize="1d", count=20, rethrow_errors=True):
+        """Get previous trades in time buckets."""
+        path = "trade/bucketed"
+        postdict = {
+            'symbol': symbol,
+            'count': count,
+            'binSize': binSize,
+            'reverse': True
+        }
+        return self._curl_bitmex(path=path, postdict=postdict, verb="GET", rethrow_errors=rethrow_errors)
     #
     # Authentication required methods
     #

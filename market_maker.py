@@ -7,6 +7,7 @@ import requests
 import atexit
 import signal
 import MySQLdb
+import redis
 
 from market_maker import bitmex
 from market_maker.settings import settings
@@ -149,6 +150,11 @@ class ExchangeInterface:
             symbol = self.symbol
         return self.bitmex.execution_trades(symbol, count, startTime, endTime)
 
+    def get_trade_bucketed(self, symbol=None, binSize="1d", count=20, rethrow_errors=True):
+        if symbol is None:
+            symbol = self.symbol
+        return self.bitmex.trade_bucketed(symbol, binSize, count)
+
     def get_highest_buy(self):
         buys = [o for o in self.get_orders() if o['side'] == 'Buy']
         if not len(buys):
@@ -257,6 +263,7 @@ class OrderManager:
             logger.info("Error: unable to fecth data")
         
         self.record_time = self.start_time
+        self.get_sma()
 
 
     def reset(self):
@@ -278,6 +285,9 @@ class OrderManager:
         self.running_qty = position['currentQty']
         tickLog = self.instrument['tickLog']
         self.start_XBt = margin["marginBalance"]
+
+        if self.tickId % 240 == 0: 
+            self.get_sma()
         
         if time() > self.tickId*60:
             sql = "INSERT INTO %s (id, markPrice, currentQty, targetUSD, totalXBT, targetXBT, currentCost, \
@@ -443,6 +453,19 @@ class OrderManager:
 
         return math.toNearest(start_position * (1 + settings.INTERVAL * self.interval_factor) ** index, self.instrument['tickSize'])
 
+    def get_sma(self):
+        pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True)
+        r = redis.Redis(host='localhost', port=6379, decode_responses=True) 
+        sma_1d = 0.0
+        for candle in self.exchange.get_trade_bucketed(count=20, binSize="1d"):
+            sma_1d = sma_1d + candle["close"] / 20.0
+        sma_4h = 0.0
+        for candle in self.exchange.get_trade_bucketed(count=80, binSize="1h"):
+            sma_4h = sma_4h + candle["close"] / 80.0
+        r.set('sma_1d', sma_1d)
+        r.set('sma_4h', sma_4h)
+        logger.info("1D SMA is: %f" % sma_1d)
+        logger.info("4H SMA is: %f" % sma_4h)
     ###
     # Orders
     ###
