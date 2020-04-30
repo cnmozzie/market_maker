@@ -492,10 +492,10 @@ class OrderManager:
         # then we match orders from the outside in, ensuring the fewest number of orders are amended and only
         # a new order is created in the inside. If we did it inside-out, all orders would be amended
         # down and a new order would be created at the outside.
-        for i in reversed(range(1, buy_order_number + 1)):
+        for i in reversed(range(1, self.buy_order_number + 1)):
             if not self.long_position_limit_exceeded():
                 buy_orders.append(self.prepare_order(-i))
-        for i in reversed(range(1, sell_order_number + 1)):
+        for i in reversed(range(1, self.sell_order_number + 1)):
             if not self.short_position_limit_exceeded():
                 sell_orders.append(self.prepare_order(i))
 
