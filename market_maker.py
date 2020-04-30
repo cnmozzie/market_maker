@@ -246,6 +246,8 @@ class OrderManager:
         self.target_xbt = 0.0
         self.mid_qty = 0
         self.smart_order = None
+        self.sell_order_number = settings.ORDER_PAIRS
+        self.buy_order_number = settings.ORDER_PAIRS
         
         self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex_test", charset='utf8' )
         # self.db = MySQLdb.connect("localhost", "bitmex_bot", "A_B0t_Us3d_f0r_r3cord_da7a", "bitmex", charset='utf8' )
@@ -316,15 +318,19 @@ class OrderManager:
                        trade["lastPx"], trade["execComm"], trade["execCost"], trade["transactTime"][:23])
                 logger.info(trade_message) #temp
                 if (trade["side"]=="Sell"):
-                    self.current_qty = self.current_qty - trade["lastQty"];
-                    self.current_cost = self.current_cost + trade["execCost"];
+                    self.current_qty = self.current_qty - trade["lastQty"]
+                    self.current_cost = self.current_cost + trade["execCost"]
                     self.buy_order_start_size = settings.ORDER_START_SIZE
                     self.sell_order_start_size = self.sell_order_start_size + settings.ORDER_STEP_SIZE
+                    self.sell_order_number = self.sell_order_number - 1
+                    self.buy_order_number = self.buy_order_number + 1
                 elif (trade["side"]=="Buy"):
                     self.current_qty = self.current_qty + trade["lastQty"];
                     self.current_cost = self.current_cost + trade["execCost"];
                     self.sell_order_start_size = settings.ORDER_START_SIZE
                     self.buy_order_start_size = self.buy_order_start_size + settings.ORDER_STEP_SIZE
+                    self.sell_order_number = self.sell_order_number + 1
+                    self.buy_order_number = self.buy_order_number - 1
                 self.current_comm = self.current_comm + trade["execComm"];
             if self.current_qty == position['currentQty']:
                 self.record_time = self.end_time
@@ -466,6 +472,12 @@ class OrderManager:
         r.set('sma_4h', sma_4h)
         logger.info("1D SMA is: %f" % sma_1d)
         logger.info("4H SMA is: %f" % sma_4h)
+        if self.instrument['markPrice'] > sma_1d and self.instrument['markPrice'] > sma_4h:
+            self.sell_order_number = 0
+            self.buy_order_number = settings.ORDER_PAIRS * 2
+        if self.instrument['markPrice'] < sma_1d and self.instrument['markPrice'] < sma_4h:
+            self.buy_order_number = 0
+            self.sell_order_number = settings.ORDER_PAIRS * 2
     ###
     # Orders
     ###
@@ -480,9 +492,10 @@ class OrderManager:
         # then we match orders from the outside in, ensuring the fewest number of orders are amended and only
         # a new order is created in the inside. If we did it inside-out, all orders would be amended
         # down and a new order would be created at the outside.
-        for i in reversed(range(1, settings.ORDER_PAIRS + 1)):
+        for i in reversed(range(1, buy_order_number + 1)):
             if not self.long_position_limit_exceeded():
                 buy_orders.append(self.prepare_order(-i))
+        for i in reversed(range(1, sell_order_number + 1)):
             if not self.short_position_limit_exceeded():
                 sell_orders.append(self.prepare_order(i))
 
