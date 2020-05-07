@@ -468,8 +468,8 @@ class OrderManager:
         sma_4h = 0.0
         for candle in self.exchange.get_trade_bucketed(count=80, binSize="1h"):
             sma_4h = sma_4h + candle["close"] / 80.0
-        r.set('sma_1d', sma_1d)
-        r.set('sma_4h', sma_4h)
+        r.set(settings.POSITION_TABLE_NAME+'sma_1d', sma_1d)
+        r.set(settings.POSITION_TABLE_NAME+'sma_4h', sma_4h)
         logger.info("1D SMA is: %f" % sma_1d)
         logger.info("4H SMA is: %f" % sma_4h)
         if self.instrument['markPrice'] > sma_1d and self.instrument['markPrice'] > sma_4h:
