@@ -380,6 +380,7 @@ class OrderManager:
             self.mid_qty = -int(self.target_usd / 2)
 
         logger.info("Current Mark Price: %.*f" % (tickLog, float(self.instrument['markPrice'])))
+        logger.info("Base Price: %f" % self.base_price)
         logger.info("Current Interval Factor: %.*f" % (2, float(self.interval_factor)))
         logger.info("Target XBT Balance: %.6f" % XBt_to_XBT(self.target_xbt))
         logger.info("Target USD Balance: %d" % self.target_usd)
@@ -420,10 +421,10 @@ class OrderManager:
             self.start_position_sell *= (1.00 + (settings.MIN_SPREAD * self.interval_factor / 2))
 
         # If the price changing too quickly, wait...
-        #if self.start_position_sell < self.base_price * 0.999:
-        #    self.start_position_sell = self.base_price * 0.999
-        #if self.start_position_buy > self.base_price * 1.001:
-        #    self.start_position_buy = self.base_price * 1.001
+        if self.start_position_sell < self.base_price * 0.99:
+            self.start_position_sell = self.base_price * 0.99
+        if self.start_position_buy > self.base_price * 1.01:
+            self.start_position_buy = self.base_price * 1.01
 
         # Midpoint, used for simpler order placement.
         self.start_position_mid = ticker["mid"]
@@ -472,10 +473,10 @@ class OrderManager:
         r.set(settings.POSITION_TABLE_NAME+'sma_4h', sma_4h)
         logger.info("1D SMA is: %f" % sma_1d)
         logger.info("4H SMA is: %f" % sma_4h)
-        if self.instrument['markPrice'] > sma_1d and self.instrument['markPrice'] > sma_4h:
+        if self.instrument['markPrice'] > sma_1d and self.instrument['markPrice'] > sma_4h and self.current_qty-self.mid_qty < -12:
             self.sell_order_number = 0
             self.buy_order_number = settings.ORDER_PAIRS * 2
-        if self.instrument['markPrice'] < sma_1d and self.instrument['markPrice'] < sma_4h:
+        if self.instrument['markPrice'] < sma_1d and self.instrument['markPrice'] < sma_4h and self.current_qty-self.mid_qty > 12:
             self.buy_order_number = 0
             self.sell_order_number = settings.ORDER_PAIRS * 2
     ###
