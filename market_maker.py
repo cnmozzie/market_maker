@@ -507,7 +507,7 @@ class OrderManager:
                 price = (self.target_usd+self.running_qty) / hold_XBT
                 if (price < self.start_position_sell):
                     logger.info("Want to sell %d @ %f" % (quantity, price))
-                    price = self.start_position_sell * (1+settings.INTERVAL)
+                    price = self.start_position_sell * (1+settings.INTERVAL/2)
                 self.smart_order = {'price': math.toNearest(price, self.instrument['tickSize']), 'orderQty': quantity, 'side': "Sell"}
         if self.running_qty-self.mid_qty < -10:
             if self.running_qty < 0 and hold_XBT < XBt_to_XBT(self.target_xbt) and self.instrument['markPrice']*XBt_to_XBT(self.start_XBt) > self.target_usd:
@@ -515,7 +515,7 @@ class OrderManager:
                 price = self.running_qty / (hold_XBT-XBt_to_XBT(self.target_xbt))
                 if (price > self.start_position_buy):
                     logger.info("Want to buy %d @ %f" % (quantity, price))
-                    price = self.start_position_buy * (1-settings.INTERVAL)
+                    price = self.start_position_buy * (1-settings.INTERVAL/2)
                 self.smart_order = {'price': math.toNearest(price, self.instrument['tickSize']), 'orderQty': quantity, 'side': "Buy"}
         if self.smart_order:
             if self.smart_order['side'] == 'Buy':
